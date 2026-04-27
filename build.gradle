@@ -65,7 +65,10 @@ project(':crawler-render') {
 }
 
 project(':crawler-parser') {
-    dependencies { api project(':crawler-common') }
+    dependencies {
+        api project(':crawler-common')
+        implementation 'org.jsoup:jsoup:1.17.2'
+    }
 }
 
 project(':crawler-dedup') {

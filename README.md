@@ -6,13 +6,16 @@ The blog describes the architecture in twelve services. This repo organizes the 
 
 ## Status
 
-**Checkpoints 1–5 complete.** 81 unit tests passing across 6 test classes; full multi-module build green.
+**Checkpoints 1–8 complete.** 127 unit tests passing across 10 test classes; full multi-module build green.
 
 * **CP1 — `crawler-common`**: `Host`, `CanonicalUrl`, `AddressFamily`, `PriorityClass`, `FetchOutcome` (17 tests)
 * **CP2 — `crawler-frontier` core**: Mercator-style two-tier scheduler with min-heap and exponential backoff (24 tests)
-* **CP3 — `crawler-frontier` persistence**: snapshot/restore round-trip + RocksDB-backed `FrontierSnapshotStore` with crash-recovery test (9 tests)
-* **CP4 — `crawler-dns`**: caching async resolver with positive + negative caches, request coalescing, per-domain in-flight cap, IP reverse-index for per-IP politeness (10 tests)
-* **CP5 — `crawler-robots`**: RFC 9309 parser (longest-match, case-sensitive paths, repeated-group merging) + `RobotsCache` with 4xx/5xx asymmetry and 7-day stale-serve fallback (24 tests)
+* **CP3 — `crawler-frontier` persistence**: snapshot/restore + RocksDB-backed store with crash-recovery test (9 tests)
+* **CP4 — `crawler-dns`**: caching async resolver with positive + negative caches, request coalescing, per-domain limit, IP reverse-index (10 tests)
+* **CP5 — `crawler-robots`**: RFC 9309 parser + cache with 4xx/5xx asymmetry and stale-serve (24 tests)
+* **CP6 — `crawler-fetcher`**: JDK `HttpClient`-based fetcher with conditional GET, redirect handling, body cap, timeout (11 tests)
+* **CP7 — `crawler-parser`**: jsoup HTML parsing, boilerplate stripping, link extraction with DOM-section attribution, 64-bit Simhash (15 tests)
+* **CP8 — `crawler-dedup`**: Bloom filter (sizing math) + two-tier dedup with exact-set fallback (20 tests)
 
 Build: JDK 17 (`jenv local 17.0`), Gradle 8.7.
 
@@ -25,10 +28,10 @@ Module status:
 | `crawler-frontier` | **core + persistence done** | Mercator two-tier scheduler + RocksDB snapshot store + crash-recovery test |
 | `crawler-dns` | **caching resolver done** | Async caching resolver, request coalescing, IP reverse-index |
 | `crawler-robots` | **RFC 9309 parser + cache done** | RFC 9309 parser, 24h cache, 4xx/5xx asymmetry, stale-serve |
-| `crawler-fetcher` | stub | HTTP/2 fetch with virtual threads, conditional GET, WARC writer |
+| `crawler-fetcher` | **JDK HttpClient impl + tests** | HTTP/2-capable fetch, conditional GET (RFC 9110), redirect handling, body cap, timeout |
 | `crawler-render` | stub | Headless Chromium queue (Phase 2) |
-| `crawler-parser` | stub | jsoup HTML parser, boilerplate stripper, link extractor |
-| `crawler-dedup` | stub | Bloom + DRUM-style URL dedup, Simhash content dedup |
+| `crawler-parser` | **jsoup impl + boilerplate + Simhash + tests** | jsoup parser, boilerplate stripper, link extractor with DOM-section, 64-bit Simhash |
+| `crawler-dedup` | **Bloom + two-tier exact-set + tests** | Bloom filter (sizing math), two-tier dedup; DRUM disk-first backstop in CP11 |
 | `crawler-importance` | stub | OPIC online importance, Cho-G/M adaptive recrawl |
 | `crawler-storage` | stub | WARC writer, CDXJ index, Cassandra per-URL state |
 | `crawler-indexer` | stub | Three Kafka streams: documents, links, operational |
