@@ -1,0 +1,132 @@
+allprojects {
+    group = 'com.hkg.distributedwebcrawler'
+    version = '0.1.0-SNAPSHOT'
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java-library'
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+    }
+
+    dependencies {
+        testImplementation platform('org.junit:junit-bom:5.10.2')
+        testImplementation 'org.junit.jupiter:junit-jupiter'
+        testImplementation 'org.assertj:assertj-core:3.25.3'
+        testRuntimeOnly  'org.junit.platform:junit-platform-launcher'
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+
+    compileJava.options.encoding     = 'UTF-8'
+    compileTestJava.options.encoding = 'UTF-8'
+}
+
+// === Module dependency graph ===
+
+project(':crawler-coordinator') {
+    dependencies { api project(':crawler-common') }
+}
+
+project(':crawler-frontier') {
+    dependencies { api project(':crawler-common') }
+}
+
+project(':crawler-dns') {
+    dependencies { api project(':crawler-common') }
+}
+
+project(':crawler-robots') {
+    dependencies {
+        api project(':crawler-common')
+        implementation project(':crawler-fetcher')
+    }
+}
+
+project(':crawler-fetcher') {
+    dependencies {
+        api project(':crawler-common')
+        implementation project(':crawler-dns')
+    }
+}
+
+project(':crawler-render') {
+    dependencies {
+        api project(':crawler-common')
+    }
+}
+
+project(':crawler-parser') {
+    dependencies { api project(':crawler-common') }
+}
+
+project(':crawler-dedup') {
+    dependencies { api project(':crawler-common') }
+}
+
+project(':crawler-importance') {
+    dependencies { api project(':crawler-common') }
+}
+
+project(':crawler-storage') {
+    dependencies { api project(':crawler-common') }
+}
+
+project(':crawler-indexer') {
+    dependencies { api project(':crawler-common') }
+}
+
+project(':crawler-control-plane') {
+    dependencies {
+        api project(':crawler-common')
+        implementation project(':crawler-coordinator')
+        implementation project(':crawler-frontier')
+    }
+}
+
+project(':crawler-node') {
+    dependencies {
+        api project(':crawler-common')
+        implementation project(':crawler-coordinator')
+        implementation project(':crawler-frontier')
+        implementation project(':crawler-dns')
+        implementation project(':crawler-robots')
+        implementation project(':crawler-fetcher')
+        implementation project(':crawler-parser')
+        implementation project(':crawler-dedup')
+        implementation project(':crawler-importance')
+        implementation project(':crawler-storage')
+        implementation project(':crawler-indexer')
+        implementation project(':crawler-control-plane')
+    }
+}
+
+project(':crawler-simulator') {
+    dependencies {
+        api project(':crawler-common')
+        implementation project(':crawler-frontier')
+        implementation project(':crawler-coordinator')
+    }
+}
+
+project(':crawler-bench') {
+    dependencies {
+        api project(':crawler-common')
+        implementation project(':crawler-node')
+    }
+}
+
+project(':crawler-admin') {
+    dependencies {
+        api project(':crawler-common')
+        implementation project(':crawler-control-plane')
+    }
+}

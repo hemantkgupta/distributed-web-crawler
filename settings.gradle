@@ -1,0 +1,34 @@
+rootProject.name = 'distributed-web-crawler'
+
+// Foundational
+include 'crawler-common'
+
+// Routing & scheduling
+include 'crawler-coordinator'
+include 'crawler-frontier'
+
+// Fetch dependencies
+include 'crawler-dns'
+include 'crawler-robots'
+
+// Fetch path
+include 'crawler-fetcher'
+include 'crawler-render'
+
+// Post-fetch processing
+include 'crawler-parser'
+include 'crawler-dedup'
+include 'crawler-importance'
+
+// Storage & downstream
+include 'crawler-storage'
+include 'crawler-indexer'
+
+// Operator + runtime
+include 'crawler-control-plane'
+include 'crawler-node'
+
+// Tools
+include 'crawler-simulator'
+include 'crawler-bench'
+include 'crawler-admin'
