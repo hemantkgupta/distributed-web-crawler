@@ -21,7 +21,10 @@ class FrontierSnapshotTest {
 
     @BeforeEach
     void setUp() {
-        t0 = Instant.parse("2026-04-27T12:00:00Z");
+        // 1s forward cushion absorbs the tiny delta between this capture and
+        // InMemoryFrontier.enqueue()'s internal Instant.now(); without it,
+        // claimNext(t0) sees nextFetchTime slightly in the future of t0.
+        t0 = Instant.now().plusSeconds(1);
     }
 
     private FrontierUrl url(String s, PriorityClass cls) {

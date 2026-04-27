@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crawler-render
+  namespace: crawler
+spec:
+  replicas: 2          # ~5% of agent count per blog §7
+  selector:
+    matchLabels:
+      app: crawler-render
+  template:
+    metadata:
+      labels:
+        app: crawler-render
+    spec:
+      # Recycled often to bound Chromium memory drift.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: render
+          image: ghcr.io/example/crawler-render:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7100
+              name: http
+          env:
+            - name: KAFKA_BOOTSTRAP
+              value: "kafka:9092"
+            - name: RENDER_TOPIC
+              value: "crawler.render.requests"
+            - name: PARSE_TOPIC
+              value: "crawler.parse.requests"
+            - name: MAX_CONCURRENT_RENDERS
+              value: "4"
+            - name: PER_RENDER_TIMEOUT_MS
+              value: "30000"
+            - name: BROWSER_RECYCLE_AFTER_RENDERS
+              value: "100"
+          resources:
+            requests:
+              cpu: "4"
+              memory: "8Gi"
+            limits:
+              cpu: "8"
+              memory: "16Gi"
+          # Chromium needs SYS_ADMIN for sandbox setup; granted via securityContext
+          # rather than relaxing pod-level seccomp.
+          securityContext:
+            capabilities:
+              add: ["SYS_ADMIN"]
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crawler-render
+  namespace: crawler
+spec:
+  ports:
+    - port: 7100
+      name: http
+  selector:
+    app: crawler-render

@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: crawler-agent
+  namespace: crawler
+  labels:
+    app: crawler-agent
+spec:
+  serviceName: crawler-agent
+  replicas: 8
+  podManagementPolicy: Parallel
+  selector:
+    matchLabels:
+      app: crawler-agent
+  template:
+    metadata:
+      labels:
+        app: crawler-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: agent
+          image: ghcr.io/example/crawler-agent:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 7000
+              name: grpc
+            - containerPort: 7001
+              name: http
+            - containerPort: 9090
+              name: metrics
+          env:
+            - name: AGENT_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: REGION
+              value: us-east
+            - name: ETCD_ENDPOINTS
+              value: "etcd-0.etcd:2379,etcd-1.etcd:2379,etcd-2.etcd:2379"
+            - name: REDIS_ADDR
+              value: "redis:6379"
+            - name: KAFKA_BOOTSTRAP
+              value: "kafka:9092"
+            - name: CASSANDRA_CONTACT
+              value: "cassandra:9042"
+            - name: DNS_RESOLVER
+              # Points at the colocated Unbound DaemonSet on this node.
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=75 -XX:+UseG1GC -XX:+ExitOnOutOfMemoryError"
+          resources:
+            requests:
+              cpu: "4"
+              memory: "8Gi"
+            limits:
+              cpu: "8"
+              memory: "16Gi"
+          volumeMounts:
+            - name: rocksdb-state
+              mountPath: /var/crawler/rocksdb
+            - name: warc-buffer
+              mountPath: /var/crawler/warc
+          readinessProbe:
+            httpGet:
+              path: /v1/frontier/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /v1/frontier/health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          lifecycle:
+            preStop:
+              exec:
+                # Ask the operator-API to drain this agent before shutdown
+                # so in-flight URLs aren't lost mid-fetch.
+                command: ["/bin/sh", "-c", "crawler-admin host quarantine $AGENT_ID && sleep 30"]
+  volumeClaimTemplates:
+    - metadata:
+        name: rocksdb-state
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: nvme-ssd
+        resources:
+          requests:
+            storage: 200Gi
+    - metadata:
+        name: warc-buffer
+        # Smaller; just the local NVMe buffer that flushes to S3 every 60s.
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: nvme-ssd
+        resources:
+          requests:
+            storage: 50Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crawler-agent
+  namespace: crawler
+spec:
+  clusterIP: None
+  ports:
+    - port: 7000
+      name: grpc
+    - port: 7001
+      name: http
+    - port: 9090
+      name: metrics
+  selector:
+    app: crawler-agent

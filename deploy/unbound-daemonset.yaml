@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: unbound
+  namespace: crawler
+  labels:
+    app: unbound
+spec:
+  selector:
+    matchLabels:
+      app: unbound
+  template:
+    metadata:
+      labels:
+        app: unbound
+    spec:
+      # Run on the host network so the agent can use ${HOST_IP}:53.
+      # BUbiNG: "essential to run a local recursive DNS server."
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: unbound
+          image: docker.io/mvance/unbound:1.19.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 53
+              hostPort: 53
+              protocol: UDP
+            - containerPort: 53
+              hostPort: 53
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+          volumeMounts:
+            - name: unbound-conf
+              mountPath: /opt/unbound/etc/unbound
+      volumes:
+        - name: unbound-conf
+          configMap:
+            name: unbound-conf
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: unbound-conf
+  namespace: crawler
+data:
+  unbound.conf: |
+    server:
+      num-threads: 8
+      msg-cache-size: 4G
+      rrset-cache-size: 8G
+      cache-min-ttl: 60
+      cache-max-ttl: 3600
+      cache-max-negative-ttl: 300
+      prefetch: yes
+      prefetch-key: yes
+      serve-expired: yes
+      serve-expired-ttl: 60
+      qname-minimisation: yes
+      harden-glue: yes
+      use-caps-for-id: yes
+      outgoing-range: 8192
+      num-queries-per-thread: 4096
+      access-control: 0.0.0.0/0 allow

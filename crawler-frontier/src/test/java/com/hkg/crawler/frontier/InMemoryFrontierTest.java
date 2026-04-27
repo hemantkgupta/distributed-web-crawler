@@ -22,7 +22,11 @@ class InMemoryFrontierTest {
     @BeforeEach
     void setUp() {
         frontier = new InMemoryFrontier();
-        t0 = Instant.parse("2026-04-27T12:00:00Z");
+        // Use Instant.now() with a small forward cushion: InMemoryFrontier.enqueue()
+        // captures Instant.now() internally to set initial host clocks, so t0 must
+        // be ≥ that capture for claims to succeed. The 1s cushion absorbs the tiny
+        // delta between this capture and per-test enqueue calls.
+        t0 = Instant.now().plusSeconds(1);
     }
 
     private FrontierUrl url(String s, PriorityClass cls) {

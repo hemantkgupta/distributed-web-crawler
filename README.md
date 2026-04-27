@@ -6,7 +6,21 @@ The blog describes the architecture in twelve services. This repo organizes the 
 
 ## Status
 
-**Phases 1 + 2 + 3 complete (Checkpoints 1–20). 256 tests passing.** Full multi-module build green across all 17 modules. The single-JVM crawler runs end-to-end (Phase 1 + 2). Phase 3 adds the distribution primitives — host-hash ring, SWIM gossip with etcd anchor, batched cross-agent forwarding with retry+DLQ, hot-host spillover with shared politeness clock — so multiple agents can scale beyond one machine without a central coordinator bottleneck.
+**All 5 phases complete (Checkpoints 1–28). 282 tests passing.** Full multi-module build green across all 17 modules. End-to-end single-JVM crawl (Phase 1+2), distribution primitives for multi-agent deployment (Phase 3), operability layer with operator API + admin CLI + render service + simulator + bench harness (Phase 4), and production deployment manifests + observability + security review (Phase 5).
+
+**Phase 4 — Operability:**
+
+* **CP21 — `crawler-render`**: Renderer SPI, `PageNeedsRenderClassifier` (SPA marker / empty-body / noscript triggers), `StubRenderer` for tests (9 tests)
+* **CP22 — `crawler-control-plane`**: `ControlPlane` façade, `ScopeConfig` with allow/denylist + wildcard, `AuditLog` with SHA-256 hash chain (12 tests)
+* **CP23 — `crawler-admin`**: `AdminCli` with subcommands (seed, takedown, host quarantine/release, pause/resume, status, audit list) (12 tests)
+* **CP24 — `crawler-simulator`**: `SimulatedClock` + `SimulatedNetwork` + `SimulatorHarness` for deterministic-replay testing (9 tests)
+* **CP25 — `crawler-bench`**: `BenchRunner` builder API for ad-hoc throughput + p50/p99 latency measurement (7 tests)
+
+**Phase 5 — Production deployment:**
+
+* **CP26 — `deploy/`**: Kubernetes manifests for agent StatefulSet, render Deployment, Unbound DaemonSet for local recursive DNS, plus operational README
+* **CP27 — Observability**: `Metrics` SPI in `crawler-common` + `InMemoryMetrics` with Prometheus text-format exporter (8 tests)
+* **CP28 — Security review**: `docs/security-review.md` covering threat model, verifiable controls, operator workflow, pre-launch checklist
 
 **Phase 1 — Foundation (single-shard correctness):**
 
