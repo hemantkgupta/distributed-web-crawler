@@ -6,16 +6,29 @@ The blog describes the architecture in twelve services. This repo organizes the 
 
 ## Status
 
-**Checkpoints 1–8 complete.** 127 unit tests passing across 10 test classes; full multi-module build green.
+**Phases 1 + 2 complete (Checkpoints 1–16). 213 tests passing.** Full multi-module build green across all 17 modules. The crawler runs end-to-end in a single JVM: seeds → frontier → DNS → robots → fetch → parse → dedup → OPIC → recrawl scheduling → WARC archive → indexer pipeline.
+
+**Phase 1 — Foundation (single-shard correctness):**
 
 * **CP1 — `crawler-common`**: `Host`, `CanonicalUrl`, `AddressFamily`, `PriorityClass`, `FetchOutcome` (17 tests)
 * **CP2 — `crawler-frontier` core**: Mercator-style two-tier scheduler with min-heap and exponential backoff (24 tests)
 * **CP3 — `crawler-frontier` persistence**: snapshot/restore + RocksDB-backed store with crash-recovery test (9 tests)
 * **CP4 — `crawler-dns`**: caching async resolver with positive + negative caches, request coalescing, per-domain limit, IP reverse-index (10 tests)
 * **CP5 — `crawler-robots`**: RFC 9309 parser + cache with 4xx/5xx asymmetry and stale-serve (24 tests)
-* **CP6 — `crawler-fetcher`**: JDK `HttpClient`-based fetcher with conditional GET, redirect handling, body cap, timeout (11 tests)
-* **CP7 — `crawler-parser`**: jsoup HTML parsing, boilerplate stripping, link extraction with DOM-section attribution, 64-bit Simhash (15 tests)
-* **CP8 — `crawler-dedup`**: Bloom filter (sizing math) + two-tier dedup with exact-set fallback (20 tests)
+* **CP6 — `crawler-fetcher`**: JDK `HttpClient` with conditional GET, redirect handling, body cap, timeout (11 tests)
+* **CP7 — `crawler-parser`**: jsoup parser, boilerplate stripping, link extraction with DOM-section, 64-bit Simhash (15 tests)
+* **CP8 — `crawler-dedup`**: Bloom filter + two-tier dedup with exact-set fallback (20 tests)
+* **CP9 — `crawler-node`**: end-to-end integration — composes all services, tested against an embedded `HttpServer` mini-website (3 tests)
+
+**Phase 2 — At-scale primitives:**
+
+* **CP10 — `SimhashIndex`**: Manku-Jain-Das partition-index — 64-bit fingerprints, k=3 default, sublinear lookup (10 tests)
+* **CP11 — `RocksDbExactUrlSet`**: DRUM-style 256-bucket RocksDB exact-set for >10⁹ URLs (5 tests)
+* **CP12 — `OpicComputer`**: online cash-distribution importance per Abiteboul-Preda-Cobena (7 tests)
+* **CP13 — `RecrawlScheduler`**: Cho/Garcia-Molina adaptive recrawl with EWMA λ̂ + interval clamping (9 tests)
+* **CP14 — `WarcWriter`**: WARC 1.1 (ISO 28500:2017) record format, rolling local-dir sink (5 tests)
+* **CP15 — `CdxjIndexer`**: Common Crawl SURT-keyed lookup index (4 tests)
+* **CP16 — `IndexerPipeline`**: three streams (documents, links, operational) over a `MessagePublisher` SPI (6 tests)
 
 Build: JDK 17 (`jenv local 17.0`), Gradle 8.7.
 
@@ -29,9 +42,13 @@ Module status:
 | `crawler-dns` | **caching resolver done** | Async caching resolver, request coalescing, IP reverse-index |
 | `crawler-robots` | **RFC 9309 parser + cache done** | RFC 9309 parser, 24h cache, 4xx/5xx asymmetry, stale-serve |
 | `crawler-fetcher` | **JDK HttpClient impl + tests** | HTTP/2-capable fetch, conditional GET (RFC 9110), redirect handling, body cap, timeout |
-| `crawler-render` | stub | Headless Chromium queue (Phase 2) |
+| `crawler-render` | stub (Phase 4) | Headless Chromium queue |
 | `crawler-parser` | **jsoup impl + boilerplate + Simhash + tests** | jsoup parser, boilerplate stripper, link extractor with DOM-section, 64-bit Simhash |
-| `crawler-dedup` | **Bloom + two-tier exact-set + tests** | Bloom filter (sizing math), two-tier dedup; DRUM disk-first backstop in CP11 |
+| `crawler-dedup` | **Bloom + two-tier + Simhash partition + DRUM** | Bloom + exact-set + RocksDB-backed DRUM for >10⁹ URLs + Simhash partition index |
+| `crawler-importance` | **OPIC + adaptive recrawl + tests** | Online OPIC cash-distribution + Cho/Garcia-Molina change-rate scheduler |
+| `crawler-storage` | **WARC writer + CDXJ indexer + tests** | WARC 1.1 records, rolling local sink, SURT-keyed CDXJ lookup index |
+| `crawler-indexer` | **IndexerPipeline + in-memory publisher + tests** | Three Kafka-shape streams: documents, links, operational |
+| `crawler-node` | **end-to-end CrawlerNode + integration tests** | Composes all services; runs against embedded HttpServer; produces WARC + indexer events |
 | `crawler-importance` | stub | OPIC online importance, Cho-G/M adaptive recrawl |
 | `crawler-storage` | stub | WARC writer, CDXJ index, Cassandra per-URL state |
 | `crawler-indexer` | stub | Three Kafka streams: documents, links, operational |
