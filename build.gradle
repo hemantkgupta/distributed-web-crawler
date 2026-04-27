@@ -72,7 +72,10 @@ project(':crawler-parser') {
 }
 
 project(':crawler-dedup') {
-    dependencies { api project(':crawler-common') }
+    dependencies {
+        api project(':crawler-common')
+        implementation 'org.rocksdb:rocksdbjni:9.0.0'
+    }
 }
 
 project(':crawler-importance') {

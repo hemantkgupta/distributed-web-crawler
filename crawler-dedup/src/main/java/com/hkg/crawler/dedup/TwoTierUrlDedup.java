@@ -2,8 +2,6 @@ package com.hkg.crawler.dedup;
 
 import com.hkg.crawler.common.CanonicalUrl;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -32,7 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class TwoTierUrlDedup implements UrlDedup {
 
     private final BloomFilter bloom;
-    private final Set<String> exactSet = ConcurrentHashMap.newKeySet();
+    private final ExactUrlSet exactSet;
 
     private final AtomicLong cQueries           = new AtomicLong();
     private final AtomicLong cNew               = new AtomicLong();
@@ -41,11 +39,18 @@ public final class TwoTierUrlDedup implements UrlDedup {
     private final AtomicLong cBloomPositive     = new AtomicLong();
     private final AtomicLong cBloomFalsePositive = new AtomicLong();
 
+    /** Default constructor: in-memory exact-set backstop. */
     public TwoTierUrlDedup(BloomFilter bloom) {
-        this.bloom = bloom;
+        this(bloom, new InMemoryExactUrlSet());
     }
 
-    /** Convenience: create a TwoTierUrlDedup sized for n URLs at fpr. */
+    /** Constructor with explicit exact-set backstop (e.g., {@link RocksDbExactUrlSet}). */
+    public TwoTierUrlDedup(BloomFilter bloom, ExactUrlSet exactSet) {
+        this.bloom    = bloom;
+        this.exactSet = exactSet;
+    }
+
+    /** Convenience: create a TwoTierUrlDedup sized for n URLs at fpr (in-memory backstop). */
     public static TwoTierUrlDedup forCapacity(long expectedUrls, double targetFpr) {
         return new TwoTierUrlDedup(BloomFilter.create(expectedUrls, targetFpr));
     }
