@@ -184,7 +184,7 @@ public final class ConsistentHashRing {
      * non-negative value (we use the full long range; TreeMap orders
      * naturally).
      */
-    static long hash(String s) {
+    public static long hash(String s) {
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
         long h = 0xcbf29ce484222325L;
         for (byte b : bytes) {

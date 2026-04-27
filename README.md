@@ -6,7 +6,7 @@ The blog describes the architecture in twelve services. This repo organizes the 
 
 ## Status
 
-**Phases 1 + 2 complete (Checkpoints 1–16). 213 tests passing.** Full multi-module build green across all 17 modules. The crawler runs end-to-end in a single JVM: seeds → frontier → DNS → robots → fetch → parse → dedup → OPIC → recrawl scheduling → WARC archive → indexer pipeline.
+**Phases 1 + 2 + 3 complete (Checkpoints 1–20). 256 tests passing.** Full multi-module build green across all 17 modules. The single-JVM crawler runs end-to-end (Phase 1 + 2). Phase 3 adds the distribution primitives — host-hash ring, SWIM gossip with etcd anchor, batched cross-agent forwarding with retry+DLQ, hot-host spillover with shared politeness clock — so multiple agents can scale beyond one machine without a central coordinator bottleneck.
 
 **Phase 1 — Foundation (single-shard correctness):**
 
@@ -30,6 +30,13 @@ The blog describes the architecture in twelve services. This repo organizes the 
 * **CP15 — `CdxjIndexer`**: Common Crawl SURT-keyed lookup index (4 tests)
 * **CP16 — `IndexerPipeline`**: three streams (documents, links, operational) over a `MessagePublisher` SPI (6 tests)
 
+**Phase 3 — Distribution:**
+
+* **CP17 — `ConsistentHashRing`**: UbiCrawler-style host-hash routing with virtual nodes (default 200/agent), `O(K/N)` rebalancing (12 tests)
+* **CP18 — `MembershipState` + SWIM gossip + `MembershipAnchor` SPI**: ALIVE/SUSPECT/DEAD state machine, generation-based precedence, etcd-anchor reconciliation for split-brain (11 tests)
+* **CP19 — `BatchingForwardingQueue` + `CrossAgentForwarder` SPI**: per-target batching (size or age trigger), retry-with-DLQ, in-memory forwarder for tests + future gRPC for production (8 tests)
+* **CP20 — `HotHostRegistry` + `SharedPolitenessClock`**: operator-configured spillover policies, URL-hash within participant set, atomic shared politeness clock (Redis WATCH/MULTI/EXEC analog) (12 tests)
+
 Build: JDK 17 (`jenv local 17.0`), Gradle 8.7.
 
 Module status:
@@ -37,7 +44,7 @@ Module status:
 | Module | Status | Implements |
 |---|---|---|
 | `crawler-common` | foundational types + tests | RFC 3986 URL canonicalization, host normalization + SURT, fetch-outcome enum |
-| `crawler-coordinator` | stub | UbiCrawler-style consistent-hash host routing, gossip membership |
+| `crawler-coordinator` | **ring + gossip + forwarding + hot-host done** | Consistent-hash ring with vnodes, SWIM gossip + etcd anchor SPI, batched cross-agent forwarder with DLQ, hot-host spillover with shared politeness clock |
 | `crawler-frontier` | **core + persistence done** | Mercator two-tier scheduler + RocksDB snapshot store + crash-recovery test |
 | `crawler-dns` | **caching resolver done** | Async caching resolver, request coalescing, IP reverse-index |
 | `crawler-robots` | **RFC 9309 parser + cache done** | RFC 9309 parser, 24h cache, 4xx/5xx asymmetry, stale-serve |
