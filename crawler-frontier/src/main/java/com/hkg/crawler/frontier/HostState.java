@@ -100,6 +100,22 @@ public final class HostState {
     }
 
     /**
+     * Package-private restore hook used by {@link InMemoryFrontier#restore}
+     * to reconstitute a snapshot's saved backoff factor without driving
+     * the verdict path.
+     */
+    void restoreBackoffFactor(double factor) {
+        if (factor < MIN_BACKOFF || factor > MAX_BACKOFF) {
+            throw new IllegalArgumentException("backoffFactor out of range: " + factor);
+        }
+        this.backoffFactor = factor;
+    }
+
+    void restoreIncrementConsecutiveErrors() {
+        this.consecutiveErrors++;
+    }
+
+    /**
      * Update host state based on a fetch verdict. Adjusts
      * {@link #backoffFactor} per the exponential rule, advances
      * {@link #nextFetchTime} to {@code now + effectiveDelay()}, and

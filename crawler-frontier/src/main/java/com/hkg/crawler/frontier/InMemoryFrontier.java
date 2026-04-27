@@ -261,11 +261,138 @@ public final class InMemoryFrontier implements Frontier {
     }
 
     /**
+     * Take a serializable snapshot of the current Frontier state. Safe
+     * to call concurrently with other operations (synchronized);
+     * produces a point-in-time view.
+     *
+     * <p>The snapshot is the unit of persistence: it is what
+     * {@code RocksDbFrontierStore} writes to disk every 10 seconds, and
+     * what {@link #restore} reads back on startup.
+     */
+    public synchronized FrontierSnapshot snapshot(Instant now) {
+        var hosts = new java.util.ArrayList<FrontierSnapshot.HostSnapshot>();
+        for (HostState s : hostState.values()) {
+            hosts.add(new FrontierSnapshot.HostSnapshot(
+                s.host().value(),
+                s.nextFetchTime().toEpochMilli(),
+                s.crawlDelay().toMillis(),
+                s.backoffFactor(),
+                s.consecutiveErrors(),
+                s.lastSuccessTime().toEpochMilli(),
+                s.backQueueDepth(),
+                s.isQuarantined()
+            ));
+        }
+        var back = new java.util.ArrayList<FrontierSnapshot.BackQueueEntry>();
+        for (var e : backQueues.entrySet()) {
+            for (FrontierUrl u : e.getValue()) {
+                back.add(new FrontierSnapshot.BackQueueEntry(
+                    e.getKey().value(),
+                    u.url().value(),
+                    u.priorityClass().name(),
+                    u.discoveredAt().toEpochMilli()
+                ));
+            }
+        }
+        var front = new java.util.ArrayList<FrontierSnapshot.FrontQueueEntry>();
+        for (var e : frontQueues.entrySet()) {
+            for (FrontierUrl u : e.getValue()) {
+                front.add(new FrontierSnapshot.FrontQueueEntry(
+                    e.getKey().name(),
+                    u.url().value(),
+                    u.discoveredAt().toEpochMilli()
+                ));
+            }
+        }
+        return new FrontierSnapshot(
+            FrontierSnapshot.CURRENT_FORMAT_VERSION,
+            now.toEpochMilli(),
+            hosts, back, front
+        );
+    }
+
+    /**
+     * Reconstruct an {@code InMemoryFrontier} from a previously taken
+     * snapshot. Used at startup to recover state after a process restart.
+     *
+     * <p>The heap is rebuilt by walking the host states; URL ordering
+     * within each back queue is preserved via the snapshot's iteration
+     * order.
+     */
+    public static InMemoryFrontier restore(FrontierSnapshot snap) {
+        if (snap.formatVersion() != FrontierSnapshot.CURRENT_FORMAT_VERSION) {
+            throw new IllegalArgumentException(
+                "Unsupported snapshot format version: " + snap.formatVersion());
+        }
+        InMemoryFrontier f = new InMemoryFrontier();
+        // First, restore host state directly (without going through enqueue,
+        // which would reset clocks).
+        for (FrontierSnapshot.HostSnapshot hs : snap.hosts()) {
+            Host host = Host.of(hs.hostName());
+            HostState s = new HostState(host, Instant.ofEpochMilli(hs.nextFetchTimeEpochMs()));
+            s.setCrawlDelay(java.time.Duration.ofMillis(hs.crawlDelayMs()));
+            // Walk to the right backoff via reflection-free repeated verdicts
+            // is impractical; we directly set it via the restoredFromSnapshot path:
+            applyBackoffFactor(s, hs.backoffFactor());
+            for (int i = 0; i < hs.consecutiveErrors(); i++) {
+                // Replaying errors here would over-multiply backoff; we already
+                // set the correct factor above. Use a no-op that just bumps
+                // the counter:
+                applyConsecutiveError(s);
+            }
+            if (hs.quarantined()) s.setQuarantined(true);
+            f.hostState.put(host, s);
+        }
+        // Restore back queues.
+        for (FrontierSnapshot.BackQueueEntry be : snap.backQueueUrls()) {
+            Host host = Host.of(be.hostName());
+            FrontierUrl url = new FrontierUrl(
+                com.hkg.crawler.common.CanonicalUrl.of(be.url()),
+                com.hkg.crawler.common.PriorityClass.valueOf(be.priorityClass()),
+                Instant.ofEpochMilli(be.discoveredAtEpochMs())
+            );
+            f.backQueues.computeIfAbsent(host, h -> new ArrayDeque<>()).addLast(url);
+        }
+        // Restore front queues.
+        for (FrontierSnapshot.FrontQueueEntry fe : snap.frontQueueUrls()) {
+            FrontierUrl url = new FrontierUrl(
+                com.hkg.crawler.common.CanonicalUrl.of(fe.url()),
+                com.hkg.crawler.common.PriorityClass.valueOf(fe.priorityClass()),
+                Instant.ofEpochMilli(fe.discoveredAtEpochMs())
+            );
+            f.frontQueues.get(com.hkg.crawler.common.PriorityClass.valueOf(fe.priorityClass()))
+                .addLast(url);
+        }
+        // Rebuild the heap from non-quarantined hosts with non-empty back queues.
+        for (Host host : f.backQueues.keySet()) {
+            if (!f.backQueues.get(host).isEmpty()) {
+                HostState s = f.hostState.get(host);
+                if (s != null && !s.isQuarantined()) {
+                    f.pushHeap(host);
+                }
+            }
+        }
+        return f;
+    }
+
+    /**
      * Test-only access to a host's state for assertions. Prefer
      * {@link #stats()} for production observability.
      */
     public synchronized Optional<HostState> hostStateFor(Host host) {
         return Optional.ofNullable(hostState.get(host));
+    }
+
+    // Helpers used by restore() to set HostState fields without going
+    // through the verdict path (which would advance the clock).
+    private static void applyBackoffFactor(HostState s, double factor) {
+        // The cleanest way without exposing setters is to drive the state
+        // via successes/errors. For restore, we'd rather just trust the
+        // snapshot and inject. We use a package-private setter on HostState.
+        s.restoreBackoffFactor(factor);
+    }
+    private static void applyConsecutiveError(HostState s) {
+        s.restoreIncrementConsecutiveErrors();
     }
 
     /**

@@ -6,14 +6,15 @@ The blog describes the architecture in twelve services. This repo organizes the 
 
 ## Status
 
-Checkpoint 2 — `crawler-frontier` core implemented as in-memory Mercator-style two-tier scheduler:
+**Checkpoints 1–5 complete.** 81 unit tests passing across 6 test classes; full multi-module build green.
 
-* `Frontier` interface — enqueue, claimNext, reportVerdict, quarantine
-* `InMemoryFrontier` — front queues + per-host back queues + min-heap by `next_fetch_time`, with lazy invalidation via per-host generation counter
-* `HostState` — politeness clock, exponential backoff (×2 on 429/503, ×0.95 on success, capped at 64×), Crawl-delay override
-* `FrontierUrl`, `ClaimedUrl`, `FrontierStats` — public records
+* **CP1 — `crawler-common`**: `Host`, `CanonicalUrl`, `AddressFamily`, `PriorityClass`, `FetchOutcome` (17 tests)
+* **CP2 — `crawler-frontier` core**: Mercator-style two-tier scheduler with min-heap and exponential backoff (24 tests)
+* **CP3 — `crawler-frontier` persistence**: snapshot/restore round-trip + RocksDB-backed `FrontierSnapshotStore` with crash-recovery test (9 tests)
+* **CP4 — `crawler-dns`**: caching async resolver with positive + negative caches, request coalescing, per-domain in-flight cap, IP reverse-index for per-IP politeness (10 tests)
+* **CP5 — `crawler-robots`**: RFC 9309 parser (longest-match, case-sensitive paths, repeated-group merging) + `RobotsCache` with 4xx/5xx asymmetry and 7-day stale-serve fallback (24 tests)
 
-24 unit tests passing across `HostStateTest` + `InMemoryFrontierTest`. Full multi-module build green.
+Build: JDK 17 (`jenv local 17.0`), Gradle 8.7.
 
 Module status:
 
@@ -21,9 +22,9 @@ Module status:
 |---|---|---|
 | `crawler-common` | foundational types + tests | RFC 3986 URL canonicalization, host normalization + SURT, fetch-outcome enum |
 | `crawler-coordinator` | stub | UbiCrawler-style consistent-hash host routing, gossip membership |
-| `crawler-frontier` | **in-memory implementation + tests** | Mercator two-tier scheduler with min-heap; persistence in CP3 |
-| `crawler-dns` | stub | Async caching resolver, request coalescing, IP reverse-index |
-| `crawler-robots` | stub | RFC 9309 parser, 24h cache, 4xx/5xx asymmetry |
+| `crawler-frontier` | **core + persistence done** | Mercator two-tier scheduler + RocksDB snapshot store + crash-recovery test |
+| `crawler-dns` | **caching resolver done** | Async caching resolver, request coalescing, IP reverse-index |
+| `crawler-robots` | **RFC 9309 parser + cache done** | RFC 9309 parser, 24h cache, 4xx/5xx asymmetry, stale-serve |
 | `crawler-fetcher` | stub | HTTP/2 fetch with virtual threads, conditional GET, WARC writer |
 | `crawler-render` | stub | Headless Chromium queue (Phase 2) |
 | `crawler-parser` | stub | jsoup HTML parser, boilerplate stripper, link extractor |

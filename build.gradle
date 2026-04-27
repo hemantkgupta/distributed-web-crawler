@@ -11,8 +11,8 @@ subprojects {
     apply plugin: 'java-library'
 
     java {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     dependencies {
@@ -37,7 +37,10 @@ project(':crawler-coordinator') {
 }
 
 project(':crawler-frontier') {
-    dependencies { api project(':crawler-common') }
+    dependencies {
+        api project(':crawler-common')
+        implementation 'org.rocksdb:rocksdbjni:9.0.0'
+    }
 }
 
 project(':crawler-dns') {
@@ -45,10 +48,7 @@ project(':crawler-dns') {
 }
 
 project(':crawler-robots') {
-    dependencies {
-        api project(':crawler-common')
-        implementation project(':crawler-fetcher')
-    }
+    dependencies { api project(':crawler-common') }
 }
 
 project(':crawler-fetcher') {
