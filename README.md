@@ -6,7 +6,14 @@ The blog describes the architecture in twelve services. This repo organizes the 
 
 ## Status
 
-Checkpoint 0: project scaffolded. `crawler-common` foundation types implemented and unit-tested (`Host`, `CanonicalUrl`, `AddressFamily`, `PriorityClass`, `FetchOutcome`).
+Checkpoint 2 — `crawler-frontier` core implemented as in-memory Mercator-style two-tier scheduler:
+
+* `Frontier` interface — enqueue, claimNext, reportVerdict, quarantine
+* `InMemoryFrontier` — front queues + per-host back queues + min-heap by `next_fetch_time`, with lazy invalidation via per-host generation counter
+* `HostState` — politeness clock, exponential backoff (×2 on 429/503, ×0.95 on success, capped at 64×), Crawl-delay override
+* `FrontierUrl`, `ClaimedUrl`, `FrontierStats` — public records
+
+24 unit tests passing across `HostStateTest` + `InMemoryFrontierTest`. Full multi-module build green.
 
 Module status:
 
@@ -14,7 +21,7 @@ Module status:
 |---|---|---|
 | `crawler-common` | foundational types + tests | RFC 3986 URL canonicalization, host normalization + SURT, fetch-outcome enum |
 | `crawler-coordinator` | stub | UbiCrawler-style consistent-hash host routing, gossip membership |
-| `crawler-frontier` | stub | Mercator two-tier scheduler with RocksDB persistence |
+| `crawler-frontier` | **in-memory implementation + tests** | Mercator two-tier scheduler with min-heap; persistence in CP3 |
 | `crawler-dns` | stub | Async caching resolver, request coalescing, IP reverse-index |
 | `crawler-robots` | stub | RFC 9309 parser, 24h cache, 4xx/5xx asymmetry |
 | `crawler-fetcher` | stub | HTTP/2 fetch with virtual threads, conditional GET, WARC writer |
